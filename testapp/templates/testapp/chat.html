@@ -1,0 +1,263 @@
+{% extends "testapp/base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-3">
+            <h4>Conversations</h4>
+            <div class="list-group" id="conversations-list">
+                <!-- Conversations will be loaded here -->
+            </div>
+            <button class="btn btn-primary mt-3" id="new-conversation">New Conversation</button>
+        </div>
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header">
+                    <h4 id="conversation-title">Chat</h4>
+                </div>
+                <div class="card-body" style="height: 400px; overflow-y: auto;" id="chat-messages">
+                    <div class="text-center text-muted" id="empty-state">
+                        Start a new conversation or select an existing one
+                    </div>
+                    <!-- Messages will be displayed here -->
+                </div>
+                <div class="card-footer">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="message-input" placeholder="Type your message...">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" id="send-button">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentConversationId = null;
+
+    // Load conversations on page load
+    $(document).ready(function() {
+        loadConversations();
+        
+        // Set up event handlers
+        $('#send-button').click(sendMessage);
+        $('#message-input').keypress(function(e) {
+            if (e.which === 13) { // Enter key
+                sendMessage();
+            }
+        });
+        
+        $('#new-conversation').click(function() {
+        // Create a new conversation via API
+        $.ajax({
+            url: '/api/chat/conversations/new/',
+            type: 'POST',
+            headers: {
+                'Authorization': 'Token ' + localStorage.getItem('token'),
+                'Content-Type': 'application/json'
+            },
+            success: function(data) {
+                // Set the current conversation ID to the new one
+                currentConversationId = data.conversation_id;
+                $('#chat-messages').html('');
+                $('#empty-state').show();
+                $('#conversation-title').text('New Conversation');
+                $('#message-input').focus();
+                
+                // Update the conversation list to show the new one
+                loadConversations();
+            },
+            error: function(xhr) {
+                console.error('Error creating new conversation:', xhr.responseText);
+                
+                // Show error message
+                $('#chat-messages').append(`
+                    <div class="message text-left mb-2">
+                        <span class="badge bg-danger text-white p-2">Error</span>
+                        <div class="card bg-danger text-white d-inline-block p-2 rounded" style="max-width: 80%;">
+                            Failed to create new conversation. Please try again.
+                        </div>
+                    </div>
+                `);
+            }
+        });
+    });
+    });
+    
+    function loadConversations() {
+        $.ajax({
+            url: '/api/chat/conversations/',
+            type: 'GET',
+            headers: {
+                'Authorization': 'Token ' + localStorage.getItem('token')
+            },
+            success: function(data) {
+                const conversationsList = $('#conversations-list');
+                conversationsList.empty();
+                
+                if (data.length === 0) {
+                    conversationsList.append('<p class="text-muted">No conversations yet</p>');
+                    return;
+                }
+                
+                data.forEach(conversation => {
+                    // Get the first few characters of the first user message as a title
+                    let title = 'Conversation ' + conversation.id;
+                    if (conversation.messages.length > 0) {
+                        const firstUserMessage = conversation.messages.find(m => m.is_user);
+                        if (firstUserMessage) {
+                            title = firstUserMessage.content.substring(0, 20) + '...';
+                        }
+                    }
+                    
+                    const item = $(`
+                        <a href="#" class="list-group-item list-group-item-action conversation-item" 
+                           data-id="${conversation.id}">
+                            ${title}
+                        </a>
+                    `);
+                    
+                    item.click(function() {
+                        loadConversation(conversation.id);
+                    });
+                    
+                    conversationsList.append(item);
+                });
+            },
+            error: function(xhr) {
+                console.error('Error loading conversations:', xhr.responseText);
+                if (xhr.status === 401) {
+                    // Redirect to login if unauthorized
+                    window.location.href = '/login/';
+                }
+            }
+        });
+    }
+    
+    function loadConversation(conversationId) {
+        $.ajax({
+            url: `/api/chat/conversations/${conversationId}/`,
+            type: 'GET',
+            headers: {
+                'Authorization': 'Token ' + localStorage.getItem('token')
+            },
+            success: function(data) {
+                currentConversationId = data.id;
+                $('#conversation-title').text('Conversation ' + data.id);
+                
+                const chatMessages = $('#chat-messages');
+                chatMessages.empty();
+                $('#empty-state').hide();
+                
+                data.messages.forEach(message => {
+                    const messageClass = message.is_user ? 'bg-light text-dark' : 'bg-primary text-white';
+                    const alignment = message.is_user ? 'text-right' : 'text-left';
+                    const sender = message.is_user ? 'You' : 'Bot';
+                    
+                    chatMessages.append(`
+                        <div class="message ${alignment} mb-2">
+                            <span class="badge ${messageClass} p-2">${sender}</span>
+                            <div class="card ${messageClass} d-inline-block p-2 rounded" style="max-width: 80%;">
+                                ${message.content.replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                    `);
+                });
+                
+                // Scroll to bottom
+                chatMessages.scrollTop(chatMessages[0].scrollHeight);
+                
+                // Highlight the selected conversation
+                $('.conversation-item').removeClass('active');
+                $(`.conversation-item[data-id="${conversationId}"]`).addClass('active');
+            },
+            error: function(xhr) {
+                console.error('Error loading conversation:', xhr.responseText);
+            }
+        });
+    }
+    
+    function sendMessage() {
+        const messageInput = $('#message-input');
+        const message = messageInput.val().trim();
+        
+        if (!message) {
+            return;
+        }
+        
+        // Clear the input
+        messageInput.val('');
+        
+        // Add user message to the UI immediately
+        const chatMessages = $('#chat-messages');
+        $('#empty-state').hide();
+        
+        chatMessages.append(`
+            <div class="message text-right mb-2">
+                <span class="badge bg-light text-dark p-2">You</span>
+                <div class="card bg-light text-dark d-inline-block p-2 rounded" style="max-width: 80%;">
+                    ${message.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+        `);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop(chatMessages[0].scrollHeight);
+        
+        // Send to API
+        $.ajax({
+            url: '/api/chat/message/',
+            type: 'POST',
+            headers: {
+                'Authorization': 'Token ' + localStorage.getItem('token'),
+                'Content-Type': 'application/json'
+            },
+            data: JSON.stringify({
+                message: message,
+                conversation_id: currentConversationId
+            }),
+            success: function(data) {
+                // Set the current conversation ID in case this is a new conversation
+                currentConversationId = data.conversation_id;
+                
+                // Add bot reply to the UI
+                chatMessages.append(`
+                    <div class="message text-left mb-2">
+                        <span class="badge bg-primary text-white p-2">Bot</span>
+                        <div class="card bg-primary text-white d-inline-block p-2 rounded" style="max-width: 80%;">
+                            ${data.message.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `);
+                
+                // Scroll to bottom
+                chatMessages.scrollTop(chatMessages[0].scrollHeight);
+                
+                // Update conversation list
+                loadConversations();
+            },
+            error: function(xhr) {
+                console.error('Error sending message:', xhr.responseText);
+                
+                // Show error in the UI
+                chatMessages.append(`
+                    <div class="message text-left mb-2">
+                        <span class="badge bg-danger text-white p-2">Error</span>
+                        <div class="card bg-danger text-white d-inline-block p-2 rounded" style="max-width: 80%;">
+                            Failed to send message. Please try again.
+                        </div>
+                    </div>
+                `);
+                
+                // Scroll to bottom
+                chatMessages.scrollTop(chatMessages[0].scrollHeight);
+            }
+        });
+    }
+</script>
+{% endblock %}

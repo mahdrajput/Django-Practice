@@ -18,3 +18,10 @@
 </form>
 <p>Don't have an account? <a href="{% url 'signup' %}">Sign up</a></p>
 {% endblock %}
+
+{% if request.session.auth_token %}
+<script>
+    // Store the token in localStorage when user logs in
+    localStorage.setItem('token', '{{ request.session.auth_token }}');
+</script>
+{% endif %}

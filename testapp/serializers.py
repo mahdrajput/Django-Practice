@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from .models import Conversation, Message
 import re
 
 class UserSerializer(serializers.ModelSerializer):
@@ -167,3 +168,25 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
                 
         instance.save()
         return instance
+    
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Message
+        fields = ['id', 'content', 'is_user', 'created_at']
+
+class ConversationSerializer(serializers.ModelSerializer):
+    messages = MessageSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Conversation
+        fields = ['id', 'created_at', 'messages']
+
+class ChatMessageSerializer(serializers.Serializer):
+    message = serializers.CharField(required=True)
+    conversation_id = serializers.IntegerField(required=False)
+
+class NewConversationSerializer(serializers.Serializer):
+    # Empty serializer since we just need to create a new conversation
+    # without any initial data
+    pass

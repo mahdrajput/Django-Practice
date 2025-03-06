@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,6 +49,7 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ]
 }
 
@@ -65,8 +69,11 @@ ROOT_URLCONF = 'practiceproject.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'DIRS': [
+            os.path.join(BASE_DIR, 'templates'),  # This is for project-level templates
+            os.path.join(BASE_DIR, 'testapp', 'templates'),  # This is for app-level templates
+        ],
+        'APP_DIRS': True,  # This allows Django to find templates in app-level template folders
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -148,3 +155,5 @@ SWAGGER_SETTINGS = {
     },
     'USE_SESSION_AUTH': False,  # Prevents login button from appearing in Swagger UI
 }
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
