@@ -73,7 +73,7 @@ def login_view(request):
             request.session['auth_token'] = token.key
             
             messages.success(request, "Login successful")
-            return redirect('home')
+            return redirect('chat')
         else:
             messages.error(request, "Invalid username or password")
     return render(request, "testapp/login.html")
