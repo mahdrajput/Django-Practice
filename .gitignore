@@ -1,5 +1,3 @@
 myenv
-db.sqlite3
 practiceproject/__pycache__
-practiceproject/settings.py
 practiceproject/.env
