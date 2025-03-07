@@ -1,0 +1,5 @@
+Django == 5.1.6
+djangorestframework == 3.15.2
+drf-yasg == 1.21.9
+openai == 1.65.4
+python-dotenv == 1.0.1
